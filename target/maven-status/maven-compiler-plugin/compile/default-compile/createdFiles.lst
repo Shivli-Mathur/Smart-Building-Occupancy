@@ -1,0 +1,5 @@
+com\occupancy\Occupancy.class
+com\occupancy\OccupancyController.class
+com\occupancy\HelloController.class
+com\occupancy\OccupancyRepository.class
+com\occupancy\OccupancyBackendApplication.class

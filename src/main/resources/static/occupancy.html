@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Building Occupancy Map</title>
+  <style>
+    /* --- your same styles here (unchanged) --- */
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏢 Building Occupancy Map</h1>
+    <div class="controls">
+      <button class="btn" onclick="addPerson()">➕ Add Person</button>
+      <button class="btn" onclick="removePerson()">➖ Remove Person</button>
+      <div class="counter">
+        <span>Total:</span>
+        <input type="number" id="totalCount" value="0" readonly>
+      </div>
+    </div>
+    <!-- Backend status -->
+    <div id="backend-status" style="margin-top:10px; font-weight:bold; color:var(--accent-dark);">
+      Checking backend...
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <!-- your rooms (unchanged) -->
+  </div>
+
+  <script>
+  // Initialize rooms and total
+  const rooms = {};
+  for (let i = 1; i <= 10; i++) {
+    rooms["room" + i] = { cap: 10, count: 0 };
+  }
+  let total = 0;
+
+  // Update UI function
+  function updateUI() {
+    document.getElementById("totalCount").value = total;
+    for (let key in rooms) {
+      let room = rooms[key];
+      document.getElementById(key+"-count").textContent = room.count;
+      document.getElementById(key+"-left").textContent = (room.cap - room.count) + " left";
+      document.getElementById(key+"-bar").style.width = (room.count / room.cap * 100) + "%";
+
+      let roomDiv = document.getElementById(key);
+      if (room.count >= room.cap) {
+        roomDiv.classList.add("full","pulse");
+      } else {
+        roomDiv.classList.remove("full","pulse");
+      }
+    }
+  }
+
+  // Add person
+  function addPerson() {
+    for (let key in rooms) {
+      if (rooms[key].count < 5) {
+        rooms[key].count++;
+        total++;
+        updateUI();
+        return;
+      }
+    }
+    for (let key in rooms) {
+      if (rooms[key].count < rooms[key].cap) {
+        rooms[key].count++;
+        total++;
+        updateUI();
+        return;
+      }
+    }
+  }
+
+  // Remove person
+  function removePerson() {
+    for (let key of Object.keys(rooms).reverse()) {
+      if (rooms[key].count > 0) {
+        rooms[key].count--;
+        total--;
+        updateUI();
+        break;
+      }
+    }
+  }
+
+  // ✅ Fetch backend status
+  function checkBackendStatus() {
+    fetch('http://localhost:8080/api/occupancy')
+  .then(response => response.json())
+  .then(data => {
+    document.getElementById("backend-status").innerText = "✅ Backend is running: " + JSON.stringify(data);
+  })
+  .catch(error => {
+    document.getElementById("backend-status").innerText = "❌ Backend not reachable";
+  });
+
+  }
+
+  // Initialize UI
+  updateUI();
+  checkBackendStatus(); // check backend when page loads
+</script>
+
+</body>
+</html>

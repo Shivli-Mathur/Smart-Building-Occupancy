@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Building Occupancy Map</title>
+  <style>
+    :root{
+      --bg-1: #eaf9f9;
+      --bg-2: #d1f3f1;
+      --card-bg: rgba(255,255,255,0.85);
+      --accent: #1CA9C9;       /* peacock blue */
+      --accent-dark: #0b7285;  /* dark teal */
+      --success: #3cb371;      /* green */
+      --danger: #d62828;       /* red */
+      --muted: #6b7280;
+      --glass-border: rgba(255,255,255,0.4);
+      --shadow: 0 6px 18px rgba(16,24,40,0.08);
+      --radius: 14px;
+      --transition: 250ms cubic-bezier(.2,.9,.25,1);
+    }
+
+    *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;}
+
+    body{
+      margin:0;
+      background:linear-gradient(135deg,var(--bg-1),var(--bg-2));
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:20px;
+      color:#222;
+    }
+
+    .header{
+      text-align:center;
+      margin-bottom:20px;
+    }
+    .header h1{
+      color:var(--accent-dark);
+      font-size:2rem;
+      margin-bottom:10px;
+    }
+
+    .controls{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      background:var(--accent);
+      border:none;
+      padding:10px 20px;
+      border-radius:var(--radius);
+      color:#fff;
+      font-size:1rem;
+      cursor:pointer;
+      box-shadow:var(--shadow);
+      transition:transform var(--transition),background var(--transition);
+    }
+    .btn:hover{background:var(--accent-dark);transform:translateY(-2px);}
+    .btn:active{transform:scale(0.95);}
+
+    .counter{
+      display:flex;
+      align-items:center;
+      gap:5px;
+      background:var(--card-bg);
+      padding:6px 10px;
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+    }
+    .counter input{
+      width:60px;
+      border:none;
+      background:transparent;
+      text-align:center;
+      font-size:1rem;
+      font-weight:bold;
+      color:var(--accent-dark);
+    }
+
+    .map-wrap{
+      width:100%;
+      max-width:900px;
+      display:flex;
+      justify-content:center;
+    }
+
+    .floor{
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:15px;
+      width:100%;
+    }
+
+    .room{
+      background:var(--card-bg);
+      border:2px solid var(--glass-border);
+      border-radius:var(--radius);
+      padding:10px;
+      box-shadow:var(--shadow);
+      transition:transform var(--transition),box-shadow var(--transition);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:space-between;
+      text-align:center;
+      min-height:140px;
+    }
+    .room:hover{transform:translateY(-4px);box-shadow:0 10px 20px rgba(0,0,0,0.15);}
+    .room.full{background:rgba(214,40,40,0.15);}
+
+    .room-name{font-weight:bold;color:var(--accent-dark);margin-bottom:5px;}
+
+    .badge{
+      background:var(--accent);
+      color:#fff;
+      padding:4px 10px;
+      border-radius:20px;
+      font-size:0.9rem;
+      margin-bottom:5px;
+    }
+
+    .capacity{
+      width:100%;
+      height:10px;
+      background:#eee;
+      border-radius:20px;
+      overflow:hidden;
+      margin:8px 0;
+    }
+    .capacity i{
+      display:block;
+      height:100%;
+      background:var(--success);
+      width:0%;
+      transition:width 0.4s ease-in-out;
+    }
+
+    .meta{
+      font-size:0.8rem;
+      color:var(--muted);
+      display:flex;
+      justify-content:space-between;
+      width:100%;
+      padding:0 4px;
+    }
+
+    @keyframes pulse {
+      0%{transform:scale(1);}
+      50%{transform:scale(1.05);}
+      100%{transform:scale(1);}
+    }
+    .pulse{animation:pulse 1s infinite;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏢 Building Occupancy Map</h1>
+    <div class="controls">
+      <button class="btn" onclick="addPerson()">➕ Add Person</button>
+      <button class="btn" onclick="removePerson()">➖ Remove Person</button>
+      <div class="counter">
+        <span>Total:</span>
+        <input type="number" id="totalCount" value="0" readonly>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div class="floor">
+      <!-- 10 Rooms -->
+      <div class="room" id="room1">
+        <div class="room-name">Room 1</div>
+        <div class="badge"><span id="room1-count">0</span>/10</div>
+        <div class="capacity"><i id="room1-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room1-left">10 left</span></div>
+      </div>
+      <div class="room" id="room2">
+        <div class="room-name">Room 2</div>
+        <div class="badge"><span id="room2-count">0</span>/10</div>
+        <div class="capacity"><i id="room2-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room2-left">10 left</span></div>
+      </div>
+      <div class="room" id="room3">
+        <div class="room-name">Room 3</div>
+        <div class="badge"><span id="room3-count">0</span>/10</div>
+        <div class="capacity"><i id="room3-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room3-left">10 left</span></div>
+      </div>
+      <div class="room" id="room4">
+        <div class="room-name">Room 4</div>
+        <div class="badge"><span id="room4-count">0</span>/10</div>
+        <div class="capacity"><i id="room4-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room4-left">10 left</span></div>
+      </div>
+      <div class="room" id="room5">
+        <div class="room-name">Room 5</div>
+        <div class="badge"><span id="room5-count">0</span>/10</div>
+        <div class="capacity"><i id="room5-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room5-left">10 left</span></div>
+      </div>
+      <div class="room" id="room6">
+        <div class="room-name">Room 6</div>
+        <div class="badge"><span id="room6-count">0</span>/10</div>
+        <div class="capacity"><i id="room6-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room6-left">10 left</span></div>
+      </div>
+      <div class="room" id="room7">
+        <div class="room-name">Room 7</div>
+        <div class="badge"><span id="room7-count">0</span>/10</div>
+        <div class="capacity"><i id="room7-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room7-left">10 left</span></div>
+      </div>
+      <div class="room" id="room8">
+        <div class="room-name">Room 8</div>
+        <div class="badge"><span id="room8-count">0</span>/10</div>
+        <div class="capacity"><i id="room8-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room8-left">10 left</span></div>
+      </div>
+      <div class="room" id="room9">
+        <div class="room-name">Room 9</div>
+        <div class="badge"><span id="room9-count">0</span>/10</div>
+        <div class="capacity"><i id="room9-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room9-left">10 left</span></div>
+      </div>
+      <div class="room" id="room10">
+        <div class="room-name">Room 10</div>
+        <div class="badge"><span id="room10-count">0</span>/10</div>
+        <div class="capacity"><i id="room10-bar"></i></div>
+        <div class="meta"><span>Available</span><span id="room10-left">10 left</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Initialize rooms and total
+  const rooms = {};
+  for (let i = 1; i <= 10; i++) {
+    rooms["room" + i] = { cap: 10, count: 0 };
+  }
+  let total = 0;
+
+  // Update UI function
+  function updateUI() {
+    document.getElementById("totalCount").value = total;
+    for (let key in rooms) {
+      let room = rooms[key];
+      document.getElementById(key+"-count").textContent = room.count;
+      document.getElementById(key+"-left").textContent = (room.cap - room.count) + " left";
+      document.getElementById(key+"-bar").style.width = (room.count / room.cap * 100) + "%";
+
+      let roomDiv = document.getElementById(key);
+      if (room.count >= room.cap) {
+        roomDiv.classList.add("full","pulse");
+      } else {
+        roomDiv.classList.remove("full","pulse");
+      }
+    }
+  }
+
+  // Add person
+  function addPerson() {
+    for (let key in rooms) {
+      if (rooms[key].count < 5) {
+        rooms[key].count++;
+        total++;
+        updateUI();
+        sendUpdateToBackend(key, rooms[key].count); // send update to backend
+        return;
+      }
+    }
+    for (let key in rooms) {
+      if (rooms[key].count < rooms[key].cap) {
+        rooms[key].count++;
+        total++;
+        updateUI();
+        sendUpdateToBackend(key, rooms[key].count);
+        return;
+      }
+    }
+  }
+
+  // Remove person
+  function removePerson() {
+    for (let key of Object.keys(rooms).reverse()) {
+      if (rooms[key].count > 0) {
+        rooms[key].count--;
+        total--;
+        updateUI();
+        sendUpdateToBackend(key, rooms[key].count);
+        break;
+      }
+    }
+  }
+
+  // Fetch initial occupancy data from backend
+  function fetchOccupancyData() {
+    fetch('http://localhost:8080/api/occupancy') // backend endpoint
+      .then(response => response.json())
+      .then(data => {
+        for (let key in data) {
+          if (rooms[key]) {
+            rooms[key].count = data[key];
+          } else if (key === 'total') {
+            total = data[key];
+          }
+        }
+        updateUI();
+      })
+      .catch(error => console.error('Error fetching data:', error));
+  }
+
+  // Send updated room count to backend
+  function sendUpdateToBackend(roomId, count) {
+    fetch('http://localhost:8080/api/occupancy/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: roomId, count: count })
+    })
+    .then(response => response.json())
+    .then(data => console.log('Backend updated:', data))
+    .catch(error => console.error('Error updating backend:', error));
+  }
+
+  // Initialize UI
+  updateUI();
+  fetchOccupancyData(); // get data from backend when page loads
+</script>
+
+</body>
+</html>
