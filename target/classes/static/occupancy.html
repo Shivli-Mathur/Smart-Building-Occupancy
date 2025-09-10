@@ -125,7 +125,7 @@
         try {
             const response = await fetch('/api/rooms');
             if (!response.ok) {
-              throw new Error(HTTP error! status: ${response.status});
+              throw new Error(`HTTP error! status: ${response.status}`);
             }
             const roomsData = await response.json();
 
