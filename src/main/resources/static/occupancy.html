@@ -1,108 +1,181 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Building Occupancy Map</title>
-  <style>
-    /* --- your same styles here (unchanged) --- */
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Building Occupancy Map</title>
+    <style>
+        :root {
+            --primary-bg: #e0f7fa;
+            --card-bg: #ffffff;
+            --header-bg: #ffffff;
+            --text-color: #37474f;
+            --primary-color: #007bff;
+            --accent-color: #4dd0e1;
+            --accent-dark: #00838f;
+            --danger-color: #ffcdd2;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --border-radius: 12px;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        body {
+            font-family: var(--font-family);
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            width: 100%;
+            max-width: 960px;
+            background: var(--header-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h1 {
+            color: var(--accent-dark);
+            margin: 0 0 15px 0;
+            font-weight: 600;
+        }
+        .map-wrap {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 16px;
+            width: 100%;
+            max-width: 960px;
+        }
+        .room-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            text-align: center;
+            box-shadow: var(--box-shadow);
+            border-top: 5px solid var(--accent-color);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .room-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+        .room-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1rem;
+            color: var(--accent-dark);
+        }
+        .occupancy-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        .room-status {
+            font-size: 0.8rem;
+            color: #78909c;
+        }
+        .room-card.full .room-status {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .room-card.full {
+            border-top-color: #d32f2f;
+        }
+        .room-controls button {
+            background: none;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin: 5px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .room-controls button:hover {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        #backend-status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🏢 Building Occupancy Map</h1>
-    <div class="controls">
-      <button class="btn" onclick="addPerson()">➕ Add Person</button>
-      <button class="btn" onclick="removePerson()">➖ Remove Person</button>
-      <div class="counter">
-        <span>Total:</span>
-        <input type="number" id="totalCount" value="0" readonly>
-      </div>
+
+    <div class="header">
+        <h1>🏢 Building Occupancy Map</h1>
+        <div id="backend-status">Checking backend connection...</div>
     </div>
-    <!-- Backend status -->
-    <div id="backend-status" style="margin-top:10px; font-weight:bold; color:var(--accent-dark);">
-      Checking backend...
+
+    <div class="map-wrap" id="map-container">
     </div>
-  </div>
 
-  <div class="map-wrap">
-    <!-- your rooms (unchanged) -->
-  </div>
+<script>
+    const mapContainer = document.getElementById('map-container');
+    const statusElement = document.getElementById('backend-status');
 
-  <script>
-  // Initialize rooms and total
-  const rooms = {};
-  for (let i = 1; i <= 10; i++) {
-    rooms["room" + i] = { cap: 10, count: 0 };
-  }
-  let total = 0;
+    async function refreshDataFromServer() {
+        try {
+            const response = await fetch('/api/rooms');
+            if (!response.ok) {
+              throw new Error(HTTP error! status: ${response.status});
+            }
+            const roomsData = await response.json();
 
-  // Update UI function
-  function updateUI() {
-    document.getElementById("totalCount").value = total;
-    for (let key in rooms) {
-      let room = rooms[key];
-      document.getElementById(key+"-count").textContent = room.count;
-      document.getElementById(key+"-left").textContent = (room.cap - room.count) + " left";
-      document.getElementById(key+"-bar").style.width = (room.count / room.cap * 100) + "%";
+            statusElement.innerText = "✅ Backend Connected Successfully";
+            statusElement.style.color = 'green';
+            mapContainer.innerHTML = '';
 
-      let roomDiv = document.getElementById(key);
-      if (room.count >= room.cap) {
-        roomDiv.classList.add("full","pulse");
-      } else {
-        roomDiv.classList.remove("full","pulse");
-      }
+            roomsData.forEach(room => {
+                const isFull = room.currentOccupancy >= room.maxCapacity;
+                const card = document.createElement('div');
+                card.className = 'room-card';
+                card.id = room.id;
+                if (isFull) {
+                    card.classList.add('full');
+                }
+
+                card.innerHTML = `
+                    <h3>${room.name}</h3>
+                    <div class="occupancy-display">
+                        <span id="${room.id}-count">${room.currentOccupancy}</span> / ${room.maxCapacity}
+                    </div>
+                    <div class="room-status" id="${room.id}-status">
+                        ${isFull ? 'Full' : (room.maxCapacity - room.currentOccupancy) + ' spots left'}
+                    </div>
+                    <div class="room-controls">
+                        <button onclick="addPersonToRoom('${room.id}')" ${isFull ? 'disabled' : ''}>+</button>
+                        <button onclick="removePersonFromRoom('${room.id}')" ${room.currentOccupancy === 0 ? 'disabled' : ''}>-</button>
+                    </div>
+                `;
+                mapContainer.appendChild(card);
+            });
+
+        } catch (error) {
+            console.error("Failed to fetch from backend:", error);
+            statusElement.innerText = "❌ Backend Not Reachable. Please ensure the server is running.";
+            statusElement.style.color = 'red';
+        }
     }
-  }
 
-  // Add person
-  function addPerson() {
-    for (let key in rooms) {
-      if (rooms[key].count < 5) {
-        rooms[key].count++;
-        total++;
-        updateUI();
-        return;
-      }
+    async function addPersonToRoom(roomId) {
+        await fetch(/api/rooms/${roomId}/add, { method: 'POST' });
+        refreshDataFromServer();
     }
-    for (let key in rooms) {
-      if (rooms[key].count < rooms[key].cap) {
-        rooms[key].count++;
-        total++;
-        updateUI();
-        return;
-      }
+
+    async function removePersonFromRoom(roomId) {
+        await fetch(/api/rooms/${roomId}/remove, { method: 'POST' });
+        refreshDataFromServer();
     }
-  }
 
-  // Remove person
-  function removePerson() {
-    for (let key of Object.keys(rooms).reverse()) {
-      if (rooms[key].count > 0) {
-        rooms[key].count--;
-        total--;
-        updateUI();
-        break;
-      }
-    }
-  }
-
-  // ✅ Fetch backend status
-  function checkBackendStatus() {
-    fetch('http://localhost:8080/api/occupancy')
-  .then(response => response.json())
-  .then(data => {
-    document.getElementById("backend-status").innerText = "✅ Backend is running: " + JSON.stringify(data);
-  })
-  .catch(error => {
-    document.getElementById("backend-status").innerText = "❌ Backend not reachable";
-  });
-
-  }
-
-  // Initialize UI
-  updateUI();
-  checkBackendStatus(); // check backend when page loads
+    window.addEventListener('DOMContentLoaded', refreshDataFromServer);
 </script>
 
 </body>

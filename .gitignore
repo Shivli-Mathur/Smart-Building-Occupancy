@@ -1,0 +1,14 @@
+# H2 Database Files
+/data/
+*.mv.db
+*.trace.db
+
+# Log files
+*.log
+
+# IDE files
+.idea/
+*.iml
+
+# Maven build output
+/target/
