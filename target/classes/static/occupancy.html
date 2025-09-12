@@ -38,6 +38,40 @@
             margin-bottom: 20px;
             text-align: center;
         }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .control-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .add-btn {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        .add-btn:hover {
+            background-color: var(--accent-dark);
+        }
+        .remove-btn {
+            background-color: #ff6b6b;
+            color: white;
+        }
+        .remove-btn:hover {
+            background-color: #ff5252;
+        }
+        .total-display {
+            font-weight: bold;
+            color: var(--accent-dark);
+            font-size: 1.1rem;
+        }
         h1 {
             color: var(--accent-dark);
             margin: 0 0 15px 0;
@@ -53,30 +87,36 @@
         .room-card {
             background: var(--card-bg);
             border-radius: var(--border-radius);
-            padding: 15px;
+            padding: 20px;
             text-align: center;
             box-shadow: var(--box-shadow);
-            border-top: 5px solid var(--accent-color);
+            border-top: 4px solid var(--accent-color);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .room-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
         }
         .room-card h3 {
             margin: 0 0 10px 0;
             font-size: 1rem;
             color: var(--accent-dark);
+            font-weight: 600;
         }
         .occupancy-display {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: bold;
             color: var(--primary-color);
-            margin-bottom: 10px;
+            margin: 10px 0;
         }
         .room-status {
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             color: #78909c;
+            margin-top: 8px;
         }
         .room-card.full .room-status {
             color: #d32f2f;
@@ -85,21 +125,28 @@
         .room-card.full {
             border-top-color: #d32f2f;
         }
+        .room-card.full .occupancy-display {
+            color: #d32f2f;
+        }
         .room-controls button {
             background: none;
             border: 1px solid var(--accent-color);
             color: var(--accent-color);
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            font-size: 1.2rem;
+            width: 25px;
+            height: 25px;
+            font-size: 1rem;
             cursor: pointer;
-            margin: 5px;
+            margin: 2px;
             transition: background-color 0.2s, color 0.2s;
         }
         .room-controls button:hover {
             background-color: var(--accent-color);
             color: white;
+        }
+        .room-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         #backend-status {
             margin-top: 15px;
@@ -111,6 +158,11 @@
 
     <div class="header">
         <h1>🏢 Building Occupancy Map</h1>
+        <div class="controls">
+            <button class="control-btn add-btn" onclick="addPersonGlobally()">Add Person</button>
+            <button class="control-btn remove-btn" onclick="removePersonGlobally()">Remove Person</button>
+            <span class="total-display">Total: <span id="total-count">0</span></span>
+        </div>
         <div id="backend-status">Checking backend connection...</div>
     </div>
 
@@ -120,12 +172,13 @@
 <script>
     const mapContainer = document.getElementById('map-container');
     const statusElement = document.getElementById('backend-status');
+    const totalCountElement = document.getElementById('total-count');
 
     async function refreshDataFromServer() {
         try {
             const response = await fetch('/api/rooms');
             if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
+              throw new Error(HTTP error! status: ${response.status});
             }
             const roomsData = await response.json();
 
@@ -133,8 +186,12 @@
             statusElement.style.color = 'green';
             mapContainer.innerHTML = '';
 
+            let totalOccupancy = 0;
+
             roomsData.forEach(room => {
+                totalOccupancy += room.currentOccupancy;
                 const isFull = room.currentOccupancy >= room.maxCapacity;
+                const spotsLeft = room.maxCapacity - room.currentOccupancy;
                 const card = document.createElement('div');
                 card.className = 'room-card';
                 card.id = room.id;
@@ -145,18 +202,19 @@
                 card.innerHTML = `
                     <h3>${room.name}</h3>
                     <div class="occupancy-display">
-                        <span id="${room.id}-count">${room.currentOccupancy}</span> / ${room.maxCapacity}
+                        <span id="${room.id}-count">${room.currentOccupancy}/${room.maxCapacity}</span>
                     </div>
                     <div class="room-status" id="${room.id}-status">
-                        ${isFull ? 'Full' : (room.maxCapacity - room.currentOccupancy) + ' spots left'}
+                        ${isFull ? 'Full' : 'Available'}
                     </div>
-                    <div class="room-controls">
-                        <button onclick="addPersonToRoom('${room.id}')" ${isFull ? 'disabled' : ''}>+</button>
-                        <button onclick="removePersonFromRoom('${room.id}')" ${room.currentOccupancy === 0 ? 'disabled' : ''}>-</button>
+                    <div class="room-status">
+                        ${isFull ? '0 left' : spotsLeft + ' left'}
                     </div>
                 `;
                 mapContainer.appendChild(card);
             });
+
+            totalCountElement.innerText = totalOccupancy;
 
         } catch (error) {
             console.error("Failed to fetch from backend:", error);
@@ -165,14 +223,42 @@
         }
     }
 
-    async function addPersonToRoom(roomId) {
-        await fetch(/api/rooms/${roomId}/add, { method: 'POST' });
-        refreshDataFromServer();
+    async function addPersonGlobally() {
+        // Add to the first available room
+        try {
+            const response = await fetch('/api/rooms');
+            const rooms = await response.json();
+            
+            for (let room of rooms) {
+                if (room.currentOccupancy < room.maxCapacity) {
+                    await fetch(/api/rooms/${room.id}/add, { method: 'POST' });
+                    refreshDataFromServer();
+                    return;
+                }
+            }
+            alert('All rooms are full!');
+        } catch (error) {
+            console.error('Error adding person:', error);
+        }
     }
 
-    async function removePersonFromRoom(roomId) {
-        await fetch(/api/rooms/${roomId}/remove, { method: 'POST' });
-        refreshDataFromServer();
+    async function removePersonGlobally() {
+        // Remove from the first occupied room
+        try {
+            const response = await fetch('/api/rooms');
+            const rooms = await response.json();
+            
+            for (let room of rooms) {
+                if (room.currentOccupancy > 0) {
+                    await fetch(/api/rooms/${room.id}/remove, { method: 'POST' });
+                    refreshDataFromServer();
+                    return;
+                }
+            }
+            alert('All rooms are empty!');
+        } catch (error) {
+            console.error('Error removing person:', error);
+        }
     }
 
     window.addEventListener('DOMContentLoaded', refreshDataFromServer);
